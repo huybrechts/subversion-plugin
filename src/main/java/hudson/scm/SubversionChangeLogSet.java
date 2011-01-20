@@ -118,9 +118,12 @@ public final class SubversionChangeLogSet extends ChangeLogSet<LogEntry> {
     public static class LogEntry extends ChangeLogSet.Entry {
         private int revision;
         private User author;
+        private String repositoryRoot;
         private String date;
         private String msg;
         private List<Path> paths = new ArrayList<Path>();
+        
+        public LogEntry() {}
 
         /**
          * Gets the {@link SubversionChangeLogSet} to which this change set belongs.
@@ -233,8 +236,16 @@ public final class SubversionChangeLogSet extends ChangeLogSet<LogEntry> {
         public void setMsg(String msg) {
             this.msg = msg;
         }
+        
+        public String getRepositoryRoot() {
+			return repositoryRoot;
+		}
 
-        public void addPath( Path p ) {
+		public void setRepositoryRoot(String repositoryRoot) {
+			this.repositoryRoot = repositoryRoot != null ? repositoryRoot.intern() : null; 
+		}
+
+		public void addPath( Path p ) {
             p.entry = this;
             paths.add(p);
         }

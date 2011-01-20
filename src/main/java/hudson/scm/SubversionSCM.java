@@ -54,6 +54,7 @@ import hudson.remoting.Callable;
 import hudson.remoting.DelegatingCallable;
 import hudson.remoting.Channel;
 import hudson.remoting.VirtualChannel;
+import hudson.scm.browsers.AGFASventon;
 import hudson.scm.subversion.Messages;
 import hudson.triggers.SCMTrigger;
 import hudson.util.EditDistance;
@@ -1566,7 +1567,7 @@ public class SubversionSCM extends SCM implements Serializable {
         public String getGlobalExcludedRevprop() {
             return globalExcludedRevprop;
         }
-
+        
         @Override
         public boolean configure(StaplerRequest req, JSONObject formData) throws FormException {
             globalExcludedRevprop = fixEmptyAndTrim(
@@ -1580,6 +1581,7 @@ public class SubversionSCM extends SCM implements Serializable {
 
         @Override
         public boolean isBrowserReusable(SubversionSCM x, SubversionSCM y) {
+        	if (x.getBrowser() instanceof AGFASventon || y.getBrowser() instanceof AGFASventon) return true;
             ModuleLocation[] xl = x.getLocations(), yl = y.getLocations();
             if (xl.length != yl.length) return false;
             for (int i = 0; i < xl.length; i++)
@@ -1941,6 +1943,9 @@ public class SubversionSCM extends SCM implements Serializable {
 
     private static final class Initializer {
         static {
+        	System.setProperty("javax.xml.parsers.SAXParserFactory",
+        			"com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl");
+        	
             if(Boolean.getBoolean("hudson.spool-svn"))
                 DAVRepositoryFactory.setup(new DefaultHTTPConnectionFactory(null,true,null));
             else

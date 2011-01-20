@@ -41,7 +41,6 @@ import org.tmatesoft.svn.core.wc.SVNLogClient;
 import org.tmatesoft.svn.core.wc.SVNRevision;
 import org.tmatesoft.svn.core.wc.SVNWCClient;
 import org.tmatesoft.svn.core.wc.SVNInfo;
-import org.tmatesoft.svn.core.wc.xml.SVNXMLLogHandler;
 import org.xml.sax.helpers.LocatorImpl;
 
 import javax.xml.transform.Result;
@@ -96,11 +95,23 @@ public final class SubversionChangeLogBuilder {
             logHandler.startDocument();
 
             for (ModuleLocation l : scm.getLocations(build)) {
-                changelogFileCreated |= buildModule(l.getURL(), svnlc, logHandler);
+					SVNURL repositoryRoot = null;
+					try {
+						repositoryRoot = l.getRepositoryRoot();
+					} catch (SVNException e) {
+						e.printStackTrace();
+						// shouldn't happen, but lets ignore it to preserve
+						// earlier behaviour. 
+					}
+					changelogFileCreated |= buildModule(repositoryRoot.toDecodedString(), 
+							l.getURL(), svnlc, logHandler);
             }
             for(SubversionSCM.External ext : externals) {
-                changelogFileCreated |= buildModule(
-                        getUrlForPath(build.getWorkspace().child(ext.path)), svnlc, logHandler);
+                String repositoryRootUrl = getRepositoryRootUrlForPath(
+                		build.getWorkspace().child(ext.path));
+                String url = getUrlForPath(build.getWorkspace().child(ext.path));
+				changelogFileCreated |= buildModule(repositoryRootUrl,
+                        url, svnlc, logHandler);
             }
 
             if(changelogFileCreated) {
@@ -117,11 +128,15 @@ public final class SubversionChangeLogBuilder {
         return path.act(new GetUrlForPath(createAuthenticationProvider()));
     }
 
+    private String getRepositoryRootUrlForPath(FilePath path) throws IOException, InterruptedException {
+        return path.act(new GetRepositoryRootUrlForPath(createAuthenticationProvider()));
+    }
+    
     private ISVNAuthenticationProvider createAuthenticationProvider() {
         return Hudson.getInstance().getDescriptorByType(SubversionSCM.DescriptorImpl.class).createAuthenticationProvider();
     }
 
-    private boolean buildModule(String url, SVNLogClient svnlc, SVNXMLLogHandler logHandler) throws IOException2 {
+    private boolean buildModule(String repositoryRootUrl, String url, SVNLogClient svnlc, SVNXMLLogHandler logHandler) throws IOException2 {
         PrintStream logger = listener.getLogger();
         Long prevRev = previousRevisions.get(url);
         if(prevRev==null) {
@@ -137,7 +152,9 @@ public final class SubversionChangeLogBuilder {
             logger.println("no change for "+url+" since the previous build");
             return false;
         }
-
+        
+        logHandler.setCurrentRepositoryRootUrl(repositoryRootUrl);
+        
         try {
             if(debug)
                 listener.getLogger().printf("Computing changelog of %1s from %2s to %3s\n",
@@ -211,6 +228,34 @@ public final class SubversionChangeLogBuilder {
                 try {
                     info = svnwc.doInfo(p, SVNRevision.WORKING);
                     return info.getURL().toDecodedString();
+                } catch (SVNException e) {
+                    e.printStackTrace();
+                    return null;
+                }
+            } finally {
+                manager.dispose();
+            }
+        }
+
+        private static final long serialVersionUID = 1L;
+    }
+
+    private static class GetRepositoryRootUrlForPath implements FileCallable<String> {
+        private final ISVNAuthenticationProvider authProvider;
+
+        public GetRepositoryRootUrlForPath(ISVNAuthenticationProvider authProvider) {
+            this.authProvider = authProvider;
+        }
+
+        public String invoke(File p, VirtualChannel channel) throws IOException {
+            final SVNClientManager manager = SubversionSCM.createSvnClientManager(authProvider);
+            try {
+                final SVNWCClient svnwc = manager.getWCClient();
+
+                SVNInfo info;
+                try {
+                    info = svnwc.doInfo(p, SVNRevision.WORKING);
+                    return info.getRepositoryRootURL().toDecodedString();
                 } catch (SVNException e) {
                     e.printStackTrace();
                     return null;
