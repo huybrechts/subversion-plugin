@@ -1279,7 +1279,7 @@ public class SubversionSCM extends SCM implements Serializable {
     }
 
     public ChangeLogParser createChangeLogParser() {
-        return new SubversionChangeLogParser();
+        return SubversionChangeLogParser.INSTANCE;
     }
 
 

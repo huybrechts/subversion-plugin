@@ -33,9 +33,7 @@ import org.xml.sax.SAXException;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
+import java.util.*;
 
 /**
  * {@link ChangeLogParser} for Subversion.
@@ -71,7 +69,25 @@ public class SubversionChangeLogParser extends ChangeLogParser {
             throw new IOException2("Failed to parse "+changelogFile,e);
         }
 
+        Map<String,String> paths = new HashMap<String,String>();
+        for (LogEntry entry: r) {
+            for (Path p: entry.getPaths()) {
+                String cachedValue = paths.get(p.getValue());
+                if (cachedValue == null) {
+                    paths.put(p.getValue(), p.getValue());
+                } else {
+                    p.setValue(cachedValue);
+                }
+            }
+        }
+
         return new SubversionChangeLogSet(build,r);
+    }
+
+    public static final SubversionChangeLogParser INSTANCE = new SubversionChangeLogParser();
+
+    public Object readResolve() {
+        return INSTANCE;
     }
 
 }

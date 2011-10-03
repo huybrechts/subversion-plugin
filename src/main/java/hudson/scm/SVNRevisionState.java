@@ -1,5 +1,8 @@
 package hudson.scm;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSortedMap;
+
 import java.io.Serializable;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -15,10 +18,15 @@ final class SVNRevisionState extends SCMRevisionState implements Serializable {
      * are implicitly pulled in via svn:externals, but it excludes those locations that
      * are added via svn:externals in a way that fixes revisions.
      */
-    final Map<String,Long> revisions;
+    Map<String,Long> revisions;
 
     SVNRevisionState(Map<String, Long> revisions) {
-        this.revisions = revisions;
+        this.revisions = ImmutableSortedMap.copyOf(revisions);
+    }
+
+    private Object readResolve() {
+        revisions = ImmutableSortedMap.copyOf(revisions);
+        return this;
     }
 
 //    public PartialOrder compareTo(SCMRevisionState rhs) {

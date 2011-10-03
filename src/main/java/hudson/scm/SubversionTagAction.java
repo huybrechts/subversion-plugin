@@ -24,6 +24,8 @@
  */
 package hudson.scm;
 
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSortedMap;
 import hudson.Extension;
 import hudson.model.AbstractBuild;
 import hudson.model.Action;
@@ -52,12 +54,7 @@ import org.tmatesoft.svn.core.wc.SVNWCUtil;
 import javax.servlet.ServletException;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -75,14 +72,21 @@ public class SubversionTagAction extends AbstractScmTagAction implements Describ
      * If a module is not tagged, the value will be empty list.
      * Never an empty map.
      */
-    private final Map<SvnInfo,List<String>> tags = new CopyOnWriteMap.Tree<SvnInfo, List<String>>();
+    private Map<SvnInfo,List<String>> tags;
 
     /*package*/ SubversionTagAction(AbstractBuild build,Collection<SvnInfo> svnInfos) {
         super(build);
         Map<SvnInfo,List<String>> m = new HashMap<SvnInfo,List<String>>();
         for (SvnInfo si : svnInfos)
-            m.put(si,new ArrayList<String>());
-        tags.putAll(m);
+            m.put(si, Collections.<String>emptyList());
+        tags = ImmutableSortedMap.copyOf(m);
+    }
+
+    private Object readResolve() {
+        if (!(tags instanceof ImmutableSortedMap)) {
+            tags = ImmutableSortedMap.copyOf(tags);
+        }
+        return this;
     }
 
     /**
@@ -119,7 +123,7 @@ public class SubversionTagAction extends AbstractScmTagAction implements Describ
      * @see #tags
      */
     public Map<SvnInfo,List<String>> getTags() {
-        return Collections.unmodifiableMap(tags);
+        return tags;
     }
 
     @Exported(name="tags")
@@ -269,8 +273,16 @@ public class SubversionTagAction extends AbstractScmTagAction implements Describ
                     }
 
                     // completed successfully
-                    for (Entry<SvnInfo,String> e : tagSet.entrySet())
-                        SubversionTagAction.this.tags.get(e.getKey()).add(e.getValue());
+                    Map<SvnInfo,List<String>> newTags = new TreeMap(SubversionTagAction.this.tags);
+                    for (Entry<SvnInfo,String> e : tagSet.entrySet()) {
+                        List<String> list = ImmutableList.<String>builder().
+                                addAll(newTags.get(e.getKey())).
+                                add(e.getValue()).
+                                build();
+                        newTags.put(e.getKey(), list);
+                    }
+                    SubversionTagAction.this.tags = ImmutableSortedMap.copyOf(newTags);
+
                     getBuild().save();
                     workerThread = null;
                 } finally {
