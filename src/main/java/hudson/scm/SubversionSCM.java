@@ -1078,7 +1078,7 @@ public class SubversionSCM extends SCM implements Serializable {
         // determine where to perform polling. prefer the node where the build happened,
         // in case a cluster is non-uniform. see http://www.nabble.com/svn-connection-from-slave-only-td24970587.html
         VirtualChannel ch=null;
-        Node n = lastCompletedBuild!=null ? lastCompletedBuild.getBuiltOn() : null;
+        Node n = (!isLocal() && lastCompletedBuild!=null) ? lastCompletedBuild.getBuiltOn() : null;
         if (n!=null) {
             Computer c = n.toComputer();
             if (c!=null)    ch = c.getChannel();
@@ -1136,6 +1136,16 @@ public class SubversionSCM extends SCM implements Serializable {
                         significantChanges ? Change.SIGNIFICANT : changes ? Change.INSIGNIFICANT : Change.NONE);
             }
         });
+    }
+
+    private boolean isLocal() {
+        for (ModuleLocation l: locations) {
+            if (!l.getURL().startsWith("http://hap.mitra.com") &&
+                !l.getURL().startsWith("http://herdesvn01.he.agfa.be")) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
